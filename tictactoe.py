@@ -1,395 +1,329 @@
 import pygame
+import sys
 import time
-from random import randint, choice, shuffle
+from random import choice, shuffle
 
-BLACK    = (   0,   0,   0)
-WHITE    = ( 255, 255, 255)
-GREEN    = (   0, 255,   0)
+# Colors
+BLACK = (0, 0, 0)
+WHITE = (255, 255, 255)
+GRAY = (200, 200, 200)
+RED = (220, 50, 50)
+BLUE = (50, 50, 220)
+GREEN = (50, 180, 50)
+LIGHT_BLUE = (230, 240, 255)
 
-pygame.init()
-  
-width = 346
-height = 400
-size = (width, height)
-screen = pygame.display.set_mode(size)
+# Game constants
+WINDOW_WIDTH = 400
+WINDOW_HEIGHT = 500
+BOARD_SIZE = 300
+CELL_SIZE = BOARD_SIZE // 3
+BOARD_OFFSET_X = (WINDOW_WIDTH - BOARD_SIZE) // 2
+BOARD_OFFSET_Y = 80
+LINE_WIDTH = 3
+MARK_WIDTH = 4
+MARK_PADDING = 25
 
-margin = 20
-line_width = 3
- 
-pygame.display.set_caption("Tic Tac Toe")
-done = False
-clock = pygame.time.Clock()
+# Game states
+STATE_MENU = "menu"
+STATE_PLAYING = "playing"
+STATE_GAME_OVER = "game_over"
 
-class Game():
-	def __init__(self):
-		self.keep_playing = True
-		self.game_over = False
-		self.stalemate = False
-		self.win = False
-	def game_end(self):
-		if self.stalemate or self.win:
-			self.game_over = True
-	def stalemate(self):
-		self.stalemate = True
-	def win(self):
-		self.win = True
-	def ask_keep_playing(self):
-		play_again = raw_input("Want to play again? (Y/N): ")
-		play_again = play_again[0].lower()
-		if play_again == "n":
-			print "Thanks for playing! \n"
-			self.keep_playing = False
-		elif play_again == "y":
-			print "Get ready!"
-			positions = [0]*9
-		else:
-			print "YES OR NO."
 
-def draw_x(screen, x, y):
-	pygame.draw.line(screen, BLACK, [35+y*100,25+x*100], [105+y*100,115+x*100], line_width)
-	pygame.draw.line(screen, BLACK, [105+y*100,25+x*100], [35+y*100,115+x*100], line_width)
+class TicTacToe:
+    def __init__(self):
+        pygame.init()
+        self.screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
+        pygame.display.set_caption("Tic Tac Toe")
+        self.clock = pygame.time.Clock()
+        self.font_large = pygame.font.Font(None, 48)
+        self.font_medium = pygame.font.Font(None, 36)
+        self.font_small = pygame.font.Font(None, 28)
 
-def draw_o(screen, x, y):
-	pygame.draw.ellipse(screen,BLACK,[35+y*100,25+x*100,70,90],line_width)
+        self.state = STATE_MENU
+        self.two_player = False
+        self.board = [0] * 9  # 0=empty, 1=X, 2=O
+        self.current_player = 1  # 1=X, 2=O
+        self.winner = 0
+        self.winning_line = None
+        self.scores = {"X": 0, "O": 0, "Draw": 0}
 
-def draw_board(screen):
-	pygame.draw.line(screen, BLACK, [margin+100, margin], [margin+100, margin+300+line_width], line_width)
-	pygame.draw.line(screen, BLACK, [margin+200+line_width, margin], [margin+200+line_width, margin+300+line_width], line_width)
-	pygame.draw.line(screen, BLACK, [margin, margin+100], [margin+300+line_width, margin+100], line_width)
-	pygame.draw.line(screen, BLACK, [margin, margin+200+line_width], [margin+300+line_width, margin+200+line_width], line_width)
+    def reset_board(self):
+        self.board = [0] * 9
+        self.current_player = 1
+        self.winner = 0
+        self.winning_line = None
 
-def draw_positions(positions):
-	for i in range(9):
-		x, y = i_to_xy(i)
-		if positions[i] == 1:
-			draw_x(screen,x,y)
-		if positions[i] == 2:
-			draw_o(screen,x,y)
+    def cell_from_mouse(self, pos):
+        """Convert mouse position to board cell index (0-8), or None if outside board."""
+        mx, my = pos
+        if (BOARD_OFFSET_X <= mx < BOARD_OFFSET_X + BOARD_SIZE and
+                BOARD_OFFSET_Y <= my < BOARD_OFFSET_Y + BOARD_SIZE):
+            col = (mx - BOARD_OFFSET_X) // CELL_SIZE
+            row = (my - BOARD_OFFSET_Y) // CELL_SIZE
+            return row * 3 + col
+        return None
 
-def draw_text(text):
-	font = pygame.font.Font(None, 32)
-	text_to_draw = font.render(text,True,BLACK)
-	screen.blit(text_to_draw, [20,340])
+    def check_winner(self):
+        """Check for a winner or draw. Sets self.winner and self.winning_line."""
+        lines = [
+            (0, 1, 2), (3, 4, 5), (6, 7, 8),  # rows
+            (0, 3, 6), (1, 4, 7), (2, 5, 8),  # cols
+            (0, 4, 8), (2, 4, 6),              # diagonals
+        ]
+        for a, b, c in lines:
+            if self.board[a] != 0 and self.board[a] == self.board[b] == self.board[c]:
+                self.winner = self.board[a]
+                self.winning_line = (a, b, c)
+                return True
 
-def draw_everything(screen,positions,text):
-	screen.fill(WHITE)
-	draw_board(screen)
-	draw_positions(positions)
-	draw_text(text)
-	pygame.display.flip()
-	clock.tick(60)
+        if all(cell != 0 for cell in self.board):
+            self.winner = -1  # draw
+            return True
+        return False
 
-def xy_to_i(x, y):
-	"""Converts x, y coordinates to index from 0-8"""
-	return x * 3 + y
+    def computer_move(self):
+        """Simple AI: win if possible, block opponent, then pick center/corner/edge."""
+        # Try to win
+        for i in range(9):
+            if self.board[i] == 0:
+                self.board[i] = 2
+                if self.check_winner() and self.winner == 2:
+                    self.winner = 0
+                    self.winning_line = None
+                    return i
+                self.board[i] = 0
+                self.winner = 0
+                self.winning_line = None
 
-def i_to_xy(i):
-	"""Converts index to x, y coordinates"""
-	row = i / 3
-	col = i % 3
-	return (row, col)
+        # Block opponent from winning
+        for i in range(9):
+            if self.board[i] == 0:
+                self.board[i] = 1
+                if self.check_winner() and self.winner == 1:
+                    self.winner = 0
+                    self.winning_line = None
+                    self.board[i] = 0
+                    return i
+                self.board[i] = 0
+                self.winner = 0
+                self.winning_line = None
 
-def win(positions):
-	"""Returns whether the game is won, which player won"""
-	#Check rows
-	for x in range(3):
-		if positions[xy_to_i(x, 0)] == positions[xy_to_i(x, 1)] == positions[xy_to_i(x, 2)]:
-			if positions[xy_to_i(x, 0)] == 1:
-				return {"won":True, "winner":1}
-			if positions[xy_to_i(x, 0)] == 2:
-				return {"won":True, "winner":2}
+        # Take center
+        if self.board[4] == 0:
+            return 4
 
-	#Check columns
-	for y in range(3):
-		if positions[xy_to_i(0, y)] == positions[xy_to_i(1, y)] == positions[xy_to_i(2, y)]:
-			if positions[xy_to_i(0, y)] == 1:
-				return {"won":True, "winner":1}
-			if positions[xy_to_i(0, y)] == 2:
-				return {"won":True, "winner":2}
+        # Take a corner
+        corners = [0, 2, 6, 8]
+        shuffle(corners)
+        for c in corners:
+            if self.board[c] == 0:
+                return c
 
-	#Check diagonals
-	if positions[0] == positions[4] == positions[8]:
-		if positions[4] == 1:
-			return {"won":True, "winner":1}
-		if positions[4] == 2:
-			return {"won":True, "winner":2}
-	if positions[2] == positions[4] == positions[6]:
-		if positions[4] == 1:
-			return {"won":True, "winner":1}
-		if positions[4] == 2:
-			return {"won":True, "winner":2}
+        # Take an edge
+        edges = [1, 3, 5, 7]
+        shuffle(edges)
+        for e in edges:
+            if self.board[e] == 0:
+                return e
 
-	#If none of the above		
-	return {"won":False, "winner":0}
+        return None
 
-def about_to_win(positions):
-	"""Returns player about to win, position"""
-	ones = 0
-	twos = 0
-	which_player = 0
+    def make_move(self, cell):
+        """Place current player's mark at cell. Returns True if valid."""
+        if self.board[cell] != 0:
+            return False
+        self.board[cell] = self.current_player
+        return True
 
-	#Horizontal rows
-	for x in range(3):
-		for y in range(3):
-			if positions[xy_to_i(x, y)] == 1:
-				ones += 1
-			if positions[xy_to_i(x, y)] == 2:
-				twos += 1
-			if ones == 2:
-				which_player = 1
-			if twos == 2:
-				which_player = 2
-		if which_player != 0:
-			for j in range(3):
-				if positions[xy_to_i(x, j)] == 0:
-					print "%s is about to win horizontally so I'm going to go at position %d" % (str(which_player), xy_to_i(x,j)+1)
-					return which_player, xy_to_i(x, j)
-		ones = 0
-		twos = 0
-		which_player = 0
+    def draw_board(self):
+        """Draw the 3x3 grid lines."""
+        for i in range(1, 3):
+            # Vertical lines
+            x = BOARD_OFFSET_X + i * CELL_SIZE
+            pygame.draw.line(self.screen, BLACK,
+                             (x, BOARD_OFFSET_Y),
+                             (x, BOARD_OFFSET_Y + BOARD_SIZE), LINE_WIDTH)
+            # Horizontal lines
+            y = BOARD_OFFSET_Y + i * CELL_SIZE
+            pygame.draw.line(self.screen, BLACK,
+                             (BOARD_OFFSET_X, y),
+                             (BOARD_OFFSET_X + BOARD_SIZE, y), LINE_WIDTH)
 
-	#Vertical rows
-	for y in range(3):
-		for x in range(3):
-			if positions[xy_to_i(x, y)] == 1:
-				ones += 1
-			if positions[xy_to_i(x, y)] == 2:
-				twos += 1
-			if ones == 2:
-				which_player = 1
-			if twos == 2:
-				which_player = 2
-		if which_player != 0:
-			for j in range(3):
-				if positions[xy_to_i(j, y)] == 0:
-					print "%s is about to win vertically so I'm going to go at position %d" % (str(which_player), xy_to_i(j,y)+1)
-					return which_player, xy_to_i(j, y)
-		ones = 0
-		twos = 0
-		which_player = 0
+    def draw_marks(self):
+        """Draw X's and O's on the board."""
+        for i in range(9):
+            row, col = divmod(i, 3)
+            cx = BOARD_OFFSET_X + col * CELL_SIZE + CELL_SIZE // 2
+            cy = BOARD_OFFSET_Y + row * CELL_SIZE + CELL_SIZE // 2
+            half = CELL_SIZE // 2 - MARK_PADDING
 
-	#Diagonal right
-	for y in range(3):
-		if positions[xy_to_i(y, y)] == 1:
-			ones += 1
-		if positions[xy_to_i(y, y)] == 2:
-			twos += 1
-		if ones == 2:
-			which_player = 1
-		if twos == 2:
-			which_player = 2
-	if which_player != 0:
-		for j in range(3):
-			if positions[xy_to_i(j, j)] == 0:
-				print "%s is about to win diagonal right so I'm going to go at position %d" % (str(which_player), xy_to_i(j,j)+1)
-				return which_player, xy_to_i(j, j)
-	ones = 0
-	twos = 0
-	which_player = 0
+            if self.board[i] == 1:  # X
+                pygame.draw.line(self.screen, RED,
+                                 (cx - half, cy - half), (cx + half, cy + half), MARK_WIDTH)
+                pygame.draw.line(self.screen, RED,
+                                 (cx + half, cy - half), (cx - half, cy + half), MARK_WIDTH)
+            elif self.board[i] == 2:  # O
+                pygame.draw.circle(self.screen, BLUE, (cx, cy), half, MARK_WIDTH)
 
-	#Diagonal left
-	for y in range(3):
-		if positions[xy_to_i(2-y, y)] == 1:
-			ones += 1
-		if positions[xy_to_i(2-y, y)] == 2:
-			twos += 1
-		if ones == 2:
-			which_player = 1
-		if twos == 2:
-			which_player = 2
-	if which_player != 0:
-		for j in range(3):
-			if positions[xy_to_i(2-j, j)] == 0:
-				print "%s is about to win diagonal left so I'm going to go at position %d" % (str(which_player), xy_to_i(2-j,j)+1)
-				return which_player, xy_to_i(2-j, j)
-	ones = 0
-	twos = 0
-	which_player = 0
+    def draw_winning_line(self):
+        """Draw a line through the winning cells."""
+        if self.winning_line is None:
+            return
+        a, _, c = self.winning_line
+        row_a, col_a = divmod(a, 3)
+        row_c, col_c = divmod(c, 3)
+        start = (BOARD_OFFSET_X + col_a * CELL_SIZE + CELL_SIZE // 2,
+                 BOARD_OFFSET_Y + row_a * CELL_SIZE + CELL_SIZE // 2)
+        end = (BOARD_OFFSET_X + col_c * CELL_SIZE + CELL_SIZE // 2,
+               BOARD_OFFSET_Y + row_c * CELL_SIZE + CELL_SIZE // 2)
+        color = RED if self.winner == 1 else BLUE
+        pygame.draw.line(self.screen, color, start, end, 6)
 
-	return 0, None
+    def draw_text_centered(self, text, y, font=None, color=BLACK):
+        if font is None:
+            font = self.font_medium
+        surface = font.render(text, True, color)
+        rect = surface.get_rect(center=(WINDOW_WIDTH // 2, y))
+        self.screen.blit(surface, rect)
 
-def stalemate(positions):
-	count = 0
-	for i in range(9):
-		if positions[i] == 1 or positions[i] == 2:
-			count += 1
-	if count == 9 and not win(positions)["won"]:
-		return True
-	return False
+    def draw_button(self, text, rect, hover=False):
+        color = LIGHT_BLUE if hover else WHITE
+        pygame.draw.rect(self.screen, color, rect, border_radius=8)
+        pygame.draw.rect(self.screen, BLACK, rect, 2, border_radius=8)
+        surface = self.font_small.render(text, True, BLACK)
+        text_rect = surface.get_rect(center=rect.center)
+        self.screen.blit(surface, text_rect)
 
-def show_stats(player_one_name,player_one_wins,player_two_name,player_two_wins,stalemates):
-	time.sleep(3)
-	screen.fill(WHITE)
-	starting_height = 100
+    def draw_menu(self):
+        self.screen.fill(WHITE)
+        self.draw_text_centered("Tic Tac Toe", 80, self.font_large)
+        self.draw_text_centered("Choose a mode:", 160, self.font_small, GRAY)
 
-	font = pygame.font.Font(None, 30)
-	text_to_draw = font.render(player_one_name+" wins: "+str(player_one_wins),True,BLACK)
-	screen.blit(text_to_draw, [20,starting_height])
-	font = pygame.font.Font(None, 30)
-	text_to_draw = font.render(player_two_name+" wins: "+str(player_two_wins),True,BLACK)
-	screen.blit(text_to_draw, [20,starting_height+50])
-	font = pygame.font.Font(None, 30)
-	text_to_draw = font.render("Stalemates: "+str(stalemates),True,BLACK)
-	screen.blit(text_to_draw, [20,starting_height+100])
+        mouse_pos = pygame.mouse.get_pos()
+        self.btn_1p = pygame.Rect(100, 200, 200, 50)
+        self.btn_2p = pygame.Rect(100, 270, 200, 50)
 
-	pygame.display.flip()
-	clock.tick(60)
-	time.sleep(2)
+        self.draw_button("1 Player (vs AI)", self.btn_1p, self.btn_1p.collidepoint(mouse_pos))
+        self.draw_button("2 Players", self.btn_2p, self.btn_2p.collidepoint(mouse_pos))
 
-	text_to_draw = font.render(player_one_name+" wins: "+str(player_one_wins),True,BLACK)
-	screen.blit(text_to_draw, [20,starting_height])
-	text_to_draw = font.render(player_two_name+" wins: "+str(player_two_wins),True,BLACK)
-	screen.blit(text_to_draw, [20,starting_height+50])
-	text_to_draw = font.render("Stalemates: "+str(stalemates),True,BLACK)
-	screen.blit(text_to_draw, [20,starting_height+100])
-	font = pygame.font.Font(None, 30)
-	text_to_draw = font.render("Want to play again? (Y or N)",True,GREEN)
-	screen.blit(text_to_draw, [20,starting_height+200])
+    def draw_playing(self):
+        self.screen.fill(WHITE)
+        mode = "vs AI" if not self.two_player else "2 Player"
+        self.draw_text_centered(f"Tic Tac Toe  -  {mode}", 30, self.font_small, GRAY)
 
-	pygame.display.flip()
-	clock.tick(60)
-	time.sleep(5)
+        # Turn indicator
+        if self.current_player == 1:
+            self.draw_text_centered("X's turn", 58, self.font_small, RED)
+        else:
+            self.draw_text_centered("O's turn", 58, self.font_small, BLUE)
 
-def game_not_over(positions):
-	is_game_won = win(positions)["won"]
-	if not stalemate(positions) and not is_game_won:
-		return True
-	else:
-		return False
+        self.draw_board()
+        self.draw_marks()
 
-def your_turn(positions,which_player):
-	while True:
-		pos = int(raw_input("Where do you want to go? (1-9): "))
-		if positions[pos-1] == 0:
-			positions[pos-1] = which_player
-			return positions
-		else:
-			print "That space is taken already!"
-			continue
+        # Scoreboard
+        score_y = BOARD_OFFSET_Y + BOARD_SIZE + 25
+        score_text = f"X: {self.scores['X']}    O: {self.scores['O']}    Draws: {self.scores['Draw']}"
+        self.draw_text_centered(score_text, score_y, self.font_small)
 
-def computer_turn(positions):
-	print " "
-	while True:
-		time.sleep(1)
-		# 1. If you can win then do it.
-		player_about_to_win, place_about_to_win = about_to_win(positions)
+    def draw_game_over(self):
+        self.screen.fill(WHITE)
+        self.draw_board()
+        self.draw_marks()
+        self.draw_winning_line()
 
-		if player_about_to_win == 2 and positions[place_about_to_win] == 0:
-			positions[place_about_to_win] = 2
-			return positions
+        msg_y = 30
+        if self.winner == -1:
+            self.draw_text_centered("It's a draw!", msg_y, self.font_large, GREEN)
+        elif self.winner == 1:
+            self.draw_text_centered("X wins!", msg_y, self.font_large, RED)
+        else:
+            self.draw_text_centered("O wins!", msg_y, self.font_large, BLUE)
 
-		# 2. If opponent is about to win then block them.
-		if player_about_to_win == 1 and positions[place_about_to_win] == 0:
-			positions[place_about_to_win] = 2
-			return positions
+        mouse_pos = pygame.mouse.get_pos()
+        btn_y = BOARD_OFFSET_Y + BOARD_SIZE + 20
+        self.btn_again = pygame.Rect(30, btn_y, 160, 45)
+        self.btn_menu = pygame.Rect(210, btn_y, 160, 45)
+        self.draw_button("Play Again", self.btn_again, self.btn_again.collidepoint(mouse_pos))
+        self.draw_button("Main Menu", self.btn_menu, self.btn_menu.collidepoint(mouse_pos))
 
-		# 3. If center square is free then take it.
-		if positions[4] == 0:
-			positions[4] = 2
-			return positions
+        score_y = btn_y + 60
+        score_text = f"X: {self.scores['X']}    O: {self.scores['O']}    Draws: {self.scores['Draw']}"
+        self.draw_text_centered(score_text, score_y, self.font_small)
 
-		# 4. If corners are free then take them.
-		corners = [0,2,6,8]
-		shuffle(corners)
-		for i in range(len(corners)):
-			pos = corners[i]
-			if positions[pos] == 0:
-				positions[pos] = 2
-				return positions
-		pos = choice([1,3,5,7])
-		if positions[pos] == 0:
-			positions[pos] = 2
-			return positions
-		else:
-			continue
+    def handle_menu_event(self, event):
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if self.btn_1p.collidepoint(event.pos):
+                self.two_player = False
+                self.reset_board()
+                self.state = STATE_PLAYING
+            elif self.btn_2p.collidepoint(event.pos):
+                self.two_player = True
+                self.reset_board()
+                self.state = STATE_PLAYING
 
-def taking_turns(whose_turn,positions):
-	if whose_turn %2 == 1:
-		print "%s's turn" % (player_one_name)
-		your_turn(positions,1)
-	if whose_turn %2 == 0:
-		print "%s's turn" % (player_two_name)
-		if one_or_two == 1:
-			computer_turn(positions)
-		if one_or_two == 2:
-			your_turn(positions,2)
+    def handle_playing_event(self, event):
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            cell = self.cell_from_mouse(event.pos)
+            if cell is not None and self.board[cell] == 0:
+                self.make_move(cell)
+                if self.check_winner():
+                    self.end_game()
+                    return
+                self.current_player = 3 - self.current_player  # toggle 1<->2
 
-g = Game()
-positions = [0]*9
-replay = 1
-player_one_wins = 0
-player_two_wins = 0
-stalemates = 0
+                # AI move
+                if not self.two_player and self.current_player == 2:
+                    ai_cell = self.computer_move()
+                    if ai_cell is not None:
+                        self.board[ai_cell] = 2
+                        if self.check_winner():
+                            self.end_game()
+                            return
+                        self.current_player = 1
 
-print "\nWelcome to TicTacToe! One player or two player?"
+    def end_game(self):
+        if self.winner == 1:
+            self.scores["X"] += 1
+        elif self.winner == 2:
+            self.scores["O"] += 1
+        else:
+            self.scores["Draw"] += 1
+        self.state = STATE_GAME_OVER
 
-while True:
-	one_or_two = raw_input("Please enter 1 or 2: ")
-	if one_or_two == "1" or one_or_two == "2":
-		one_or_two = int(one_or_two)
-		break
-	else:
-		print "1 or 2. It's not that hard."
+    def handle_game_over_event(self, event):
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if self.btn_again.collidepoint(event.pos):
+                self.reset_board()
+                self.state = STATE_PLAYING
+            elif self.btn_menu.collidepoint(event.pos):
+                self.reset_board()
+                self.state = STATE_MENU
 
-if one_or_two == 2:
-	player_one_name = raw_input("What is Player 1's name? ")
-	player_two_name = raw_input("What is Player 2's name? ")
-else:
-	player_one_name = raw_input("What is Player 1's name? ")
-	player_two_name = "Computer"
+    def run(self):
+        while True:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit()
 
-whose_turn = 1
-coin = randint(0,1)
-if coin == 0:
-	coin = "h"
-else:
-	coin = "t"
-while True:
-	guess = raw_input("Heads or Tails?: ")
-	guess = guess[0].lower()
-	if guess == "h" or guess == "t":
-		break
-	else:
-		print "You didn't pick heads or tails!"
-if guess == coin:
-	print "%s gets to go first! \n" % (player_one_name)
-else:
-	whose_turn = 2
-	print "Sorry! %s gets to go first! \n" % (player_two_name)
+                if self.state == STATE_MENU:
+                    self.handle_menu_event(event)
+                elif self.state == STATE_PLAYING:
+                    self.handle_playing_event(event)
+                elif self.state == STATE_GAME_OVER:
+                    self.handle_game_over_event(event)
 
-while not done:
-	
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            done = True
-	    if event.type == pygame.KEYDOWN:
-	    	key = pygame.key.name(event.key)
+            if self.state == STATE_MENU:
+                self.draw_menu()
+            elif self.state == STATE_PLAYING:
+                self.draw_playing()
+            elif self.state == STATE_GAME_OVER:
+                self.draw_game_over()
 
-	while g.keep_playing:
-		while game_not_over(positions):
-			draw_everything(screen,positions,"")
+            pygame.display.flip()
+            self.clock.tick(60)
 
-			#Main game play		
-			taking_turns(whose_turn,positions)
-			draw_everything(screen,positions,"")
-			whose_turn += 1
 
-		if stalemate(positions):
-			stalemates += 1
-			print "Stalemate! \n"
-
-		if win(positions)["won"]:
-			if win(positions)["winner"] == 1:
-				player_one_wins += 1
-				print "*****%s wins!***** \n" % (player_one_name)
-			if win(positions)["winner"] == 2:
-				player_two_wins += 1
-				print "*****%s won.***** \n" % (player_two_name)
-			
-		show_stats(player_one_name,player_one_wins,player_two_name,player_two_wins,stalemates)
-
-		#Checking if they want to play again
-		g.ask_keep_playing()
-		positions = [0]*9		
-
-pygame.quit()
+if __name__ == "__main__":
+    game = TicTacToe()
+    game.run()
