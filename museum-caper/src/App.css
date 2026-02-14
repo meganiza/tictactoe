@@ -1,0 +1,566 @@
+/* ===== APP LAYOUT ===== */
+.app {
+  width: 100%;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 24px;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.app-header h1 {
+  font-size: 1.3rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.game-layout {
+  display: flex;
+  flex: 1;
+  gap: 16px;
+  padding: 16px;
+  overflow: auto;
+}
+
+.board-wrapper {
+  flex-shrink: 0;
+}
+
+.hud-wrapper {
+  flex: 1;
+  min-width: 280px;
+  max-width: 400px;
+}
+
+/* ===== BOARD ===== */
+.board-container {
+  background: #fff;
+  border-radius: 8px;
+  padding: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  display: inline-block;
+}
+
+.board-svg {
+  display: block;
+}
+
+.room-label {
+  pointer-events: none;
+  user-select: none;
+}
+
+.detective-token {
+  transition: all 0.3s ease;
+}
+
+.thief-token {
+  animation: pulse-thief 1s ease-in-out infinite;
+}
+
+@keyframes pulse-thief {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.highlight-pulse {
+  animation: highlight-glow 0.8s ease-in-out infinite alternate;
+}
+
+@keyframes highlight-glow {
+  from { opacity: 0.5; }
+  to { opacity: 1; }
+}
+
+/* ===== BUTTONS ===== */
+.btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.btn:active {
+  transform: translateY(0);
+}
+
+.btn-primary {
+  background: #4361ee;
+  color: white;
+}
+
+.btn-primary:hover {
+  background: #3a56d4;
+}
+
+.btn-accent {
+  background: #f72585;
+  color: white;
+}
+
+.btn-accent:hover {
+  background: #d91e71;
+}
+
+.btn-secondary {
+  background: #6c757d;
+  color: white;
+}
+
+.btn-secondary:hover {
+  background: #5a6268;
+}
+
+.btn-small {
+  padding: 4px 12px;
+  font-size: 0.8rem;
+  background: rgba(255, 255, 255, 0.15);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.btn-small:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* ===== GAME HUD ===== */
+.game-hud {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.hud-status {
+  background: #fff;
+  border-radius: 8px;
+  padding: 12px 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.turn-info {
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.thief-turn {
+  color: #333;
+}
+
+.detective-turn {
+  font-weight: 700;
+}
+
+.game-over {
+  font-size: 1.2rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.game-over.thief-escaped {
+  color: #d63031;
+}
+
+.game-over.thief-caught {
+  color: #00b894;
+}
+
+.hud-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.dice-result {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.die {
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  font-weight: 700;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.movement-die {
+  background: #fff;
+  border: 2px solid #333;
+  color: #333;
+}
+
+.special-die {
+  background: #4361ee;
+  color: #fff;
+  font-size: 1.3rem;
+}
+
+.special-die.blank {
+  background: #999;
+}
+
+.special-die.eye {
+  background: #e17055;
+}
+
+.special-die.motion {
+  background: #00b894;
+}
+
+.special-die.scan {
+  background: #6c5ce7;
+}
+
+.escape-options {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* ===== STATS ===== */
+.hud-stats {
+  background: #fff;
+  border-radius: 8px;
+  padding: 12px 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+}
+
+.stat-label {
+  font-size: 0.75rem;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.stat-value {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #333;
+}
+
+.stat-value.power-off {
+  color: #d63031;
+}
+
+/* ===== MESSAGE LOG ===== */
+.message-log {
+  background: #fff;
+  border-radius: 8px;
+  padding: 12px 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.message-log h3 {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #666;
+  margin-bottom: 8px;
+}
+
+.messages {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.message {
+  font-size: 0.85rem;
+  padding: 4px 8px;
+  border-radius: 4px;
+  border-left: 3px solid #ccc;
+}
+
+.msg-info {
+  border-left-color: #4361ee;
+  background: #f0f4ff;
+}
+
+.msg-alert {
+  border-left-color: #d63031;
+  background: #fff0f0;
+  font-weight: 600;
+}
+
+.msg-thief {
+  border-left-color: #333;
+  background: #f5f5f5;
+}
+
+.msg-detective {
+  border-left-color: #00b894;
+  background: #f0fff8;
+}
+
+.msg-system {
+  border-left-color: #6c5ce7;
+  background: #f5f0ff;
+}
+
+/* ===== SETUP SCREEN ===== */
+.setup-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+}
+
+.setup-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 32px;
+  max-width: 600px;
+  width: 100%;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.setup-title {
+  font-size: 1.8rem;
+  color: #1a1a2e;
+  margin-bottom: 4px;
+  text-align: center;
+}
+
+.setup-subtitle {
+  color: #666;
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.setup-section {
+  margin-bottom: 24px;
+}
+
+.setup-section h2 {
+  font-size: 1rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #666;
+  margin-bottom: 12px;
+}
+
+.mode-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.mode-btn {
+  border: 2px solid #e0e0e0;
+  border-radius: 12px;
+  padding: 16px;
+  background: #fff;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
+}
+
+.mode-btn:hover {
+  border-color: #4361ee;
+  background: #f8f9ff;
+}
+
+.mode-btn.active {
+  border-color: #4361ee;
+  background: #eef0ff;
+  box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.2);
+}
+
+.mode-icon {
+  font-size: 2rem;
+  margin-bottom: 8px;
+}
+
+.mode-label {
+  font-weight: 700;
+  font-size: 0.95rem;
+  margin-bottom: 4px;
+}
+
+.mode-desc {
+  font-size: 0.8rem;
+  color: #666;
+}
+
+.detective-options {
+  display: flex;
+  gap: 12px;
+}
+
+.det-btn {
+  width: 48px;
+  height: 48px;
+  border: 2px solid #e0e0e0;
+  border-radius: 12px;
+  background: #fff;
+  font-size: 1.2rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.det-btn:hover {
+  border-color: #4361ee;
+}
+
+.det-btn.active {
+  border-color: #4361ee;
+  background: #eef0ff;
+  color: #4361ee;
+}
+
+.det-hint {
+  font-size: 0.8rem;
+  color: #888;
+  margin-top: 8px;
+}
+
+.rules-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rule {
+  font-size: 0.85rem;
+  color: #444;
+  padding: 8px 12px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  line-height: 1.4;
+}
+
+.btn-start {
+  width: 100%;
+  padding: 14px;
+  font-size: 1.1rem;
+  background: linear-gradient(135deg, #4361ee 0%, #3a56d4 100%);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-start:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(67, 97, 238, 0.4);
+}
+
+/* ===== THIEF SCREEN OVERLAY ===== */
+.thief-screen-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.thief-screen-card {
+  background: #1a1a2e;
+  color: #fff;
+  border-radius: 16px;
+  padding: 32px;
+  max-width: 400px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+.thief-screen-card h2 {
+  font-size: 1.5rem;
+  margin-bottom: 8px;
+}
+
+.thief-screen-card p {
+  color: #aaa;
+  margin-bottom: 20px;
+}
+
+.thief-info {
+  text-align: left;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 20px;
+}
+
+.thief-stat {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+  font-size: 0.9rem;
+}
+
+.thief-stat span {
+  color: #aaa;
+}
+
+.thief-stat strong {
+  color: #fff;
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 768px) {
+  .game-layout {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .hud-wrapper {
+    max-width: 100%;
+  }
+
+  .board-container {
+    overflow-x: auto;
+  }
+
+  .mode-options {
+    grid-template-columns: 1fr;
+  }
+
+  .setup-title {
+    font-size: 1.4rem;
+  }
+}
