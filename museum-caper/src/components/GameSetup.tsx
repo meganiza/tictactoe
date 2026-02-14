@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { GameMode } from '../game/types';
+import { useState } from 'react';
+import type { GameMode } from '../game/types';
 
 interface GameSetupProps {
   onStart: (mode: GameMode, numDetectives: number) => void;

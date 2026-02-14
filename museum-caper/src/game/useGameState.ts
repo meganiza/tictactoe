@@ -1,11 +1,9 @@
 import { useReducer, useCallback, useEffect, useRef } from 'react';
-import {
-  GameState, GameMode, Position,
-} from './types';
+import type { GameState, GameMode, Position } from './types';
 import {
   createInitialGameState, moveThief, moveDetective, rollDetectiveDice,
   useSpecialAction, skipSpecialAction, endDetectiveMove, thiefAttemptEscape,
-  getAdjacentExits, posEquals,
+  posEquals,
 } from './gameEngine';
 import { getAIThiefMove, getAIEscapeExit } from './aiThief';
 import { getReachableCells, getAllExits } from './boardData';

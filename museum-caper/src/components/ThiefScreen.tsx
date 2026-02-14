@@ -1,5 +1,4 @@
-import React from 'react';
-import { GameState } from '../game/types';
+import type { GameState } from '../game/types';
 import { ROOMS } from '../game/boardData';
 
 interface ThiefScreenProps {

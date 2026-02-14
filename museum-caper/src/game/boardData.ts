@@ -1,4 +1,4 @@
-import { CellData, ExitInfo, Position, RoomColor, RoomDefinition } from './types';
+import type { CellData, ExitInfo, Position, RoomColor, RoomDefinition } from './types';
 
 // ===== ROOM DEFINITIONS =====
 export const ROOMS: RoomDefinition[] = [

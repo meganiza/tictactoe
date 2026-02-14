@@ -1,4 +1,4 @@
-import {
+import type {
   GameState, GameMode, Detective, DetectiveColor,
   ThiefState, DiceResult, SpecialAction, GameMessage, Position, CellData, ExitInfo,
 } from './types';

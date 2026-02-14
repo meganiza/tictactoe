@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useGameState } from './game/useGameState';
 import { GameSetup } from './components/GameSetup';
 import { Board } from './components/Board';
@@ -6,7 +6,7 @@ import { GameHUD } from './components/GameHUD';
 import { ThiefScreen } from './components/ThiefScreen';
 import { getAllExits, getReachableCells } from './game/boardData';
 import { posEquals } from './game/gameEngine';
-import { Position } from './game/types';
+import type { Position } from './game/types';
 import './App.css';
 
 function App() {
@@ -45,7 +45,7 @@ function App() {
     && thiefScreenVisible;
 
   // Auto-show thief screen when it becomes thief's turn in local multiplayer
-  React.useEffect(() => {
+  useEffect(() => {
     if (state?.mode === 'local-multiplayer' && state.turnPhase === 'thief-move' && state.phase === 'playing') {
       setThiefScreenVisible(true);
     }

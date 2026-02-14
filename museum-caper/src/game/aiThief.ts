@@ -1,4 +1,4 @@
-import { GameState, Position } from './types';
+import type { GameState, Position, CellData } from './types';
 import {
   getAdjacentCells, hasLineOfSight, getAllExits,
 } from './boardData';
@@ -16,7 +16,7 @@ interface ScoredMove {
 }
 
 export function getAIThiefMove(state: GameState): Position[] {
-  const { thief, board, detectives } = state;
+  const { thief } = state;
 
   // First move: pick entry point
   if (thief.position.row === -1) {
@@ -56,9 +56,9 @@ function getEntryMoves(state: GameState): Position[] {
 }
 
 function planMoves(state: GameState, maxSteps: number): Position[] {
-  const { thief, board, detectives } = state;
+  const { thief, board } = state;
   const moves: Position[] = [];
-  let currentPos = { ...thief.position };
+  let currentPos = thief.position;
 
   for (let step = 0; step < maxSteps; step++) {
     const candidates = getAdjacentCells(currentPos, board);
@@ -83,11 +83,11 @@ function planMoves(state: GameState, maxSteps: number): Position[] {
 
 function scorePosition(
   pos: Position,
-  currentPos: Position,
+  _currentPos: Position,
   state: GameState,
   plannedMoves: Position[],
 ): number {
-  const { thief, board, detectives } = state;
+  const { thief, board } = state;
   let score = 0;
 
   const cell = board[pos.row][pos.col];
@@ -136,7 +136,7 @@ function scorePosition(
   // ===== AVOIDANCE =====
 
   // Avoid detectives (heavily penalize being in line of sight)
-  for (const det of detectives) {
+  for (const det of state.detectives) {
     const dist = Math.abs(pos.row - det.position.row) + Math.abs(pos.col - det.position.col);
 
     // Direct line of sight: bad

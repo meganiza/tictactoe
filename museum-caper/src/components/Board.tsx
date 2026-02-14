@@ -1,7 +1,6 @@
 import React, { useMemo } from 'react';
-import { CellData, Position, GameState, Detective } from '../game/types';
+import type { CellData, Position, GameState, Detective } from '../game/types';
 import { ROOMS } from '../game/boardData';
-import { posEquals } from '../game/gameEngine';
 
 interface BoardProps {
   state: GameState;
