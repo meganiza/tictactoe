@@ -8,7 +8,7 @@ interface ThiefScreenProps {
 
 // This overlay is shown during the thief's turn in local multiplayer
 // to prevent detectives from seeing the thief's moves.
-export const ThiefScreen: React.FC<ThiefScreenProps> = ({ state, onReady }) => {
+export const ThiefScreen = ({ state, onReady }: ThiefScreenProps) => {
   const { thief, board } = state;
 
   return (

@@ -5,7 +5,7 @@ interface GameSetupProps {
   onStart: (mode: GameMode, numDetectives: number) => void;
 }
 
-export const GameSetup: React.FC<GameSetupProps> = ({ onStart }) => {
+export const GameSetup = ({ onStart }: GameSetupProps) => {
   const [mode, setMode] = useState<GameMode>('ai-thief');
   const [numDetectives, setNumDetectives] = useState(2);
 

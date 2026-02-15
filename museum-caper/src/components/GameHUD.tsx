@@ -11,9 +11,9 @@ interface GameHUDProps {
   onReset: () => void;
 }
 
-export const GameHUD: React.FC<GameHUDProps> = ({
+export const GameHUD = ({
   state, onRollDice, onUseSpecial, onSkipSpecial, onEndMove, onAttemptEscape, onReset,
-}) => {
+}: GameHUDProps) => {
   const {
     phase, turnPhase, thief, detectives, currentDetectiveIndex,
     diceResult, movesRemaining, specialUsed, mode,
@@ -156,13 +156,13 @@ export const GameHUD: React.FC<GameHUDProps> = ({
   );
 };
 
-const DiceFace: React.FC<{ value: number }> = ({ value }) => (
+const DiceFace = ({ value }: { value: number }) => (
   <div className="die movement-die">
     <span>{value}</span>
   </div>
 );
 
-const SpecialDieFace: React.FC<{ action: string | null }> = ({ action }) => (
+const SpecialDieFace = ({ action }: { action: string | null }) => (
   <div className={`die special-die ${action || 'blank'}`}>
     <span>{getSpecialIcon(action)}</span>
   </div>
