@@ -97,6 +97,11 @@ export interface GameState {
 
   // Messages / log
   messages: GameMessage[];
+  pendingMessages: PendingMessage[];
+
+  // Detective knowledge (what they've discovered)
+  knownDisabledCameras: number[];  // cameras detectives know are disabled
+  knownPowerOff: boolean;          // whether detectives know power is off
 
   // Setup state
   setupPhase: 'mode' | 'detectives' | 'paintings' | 'locks' | 'ready';
@@ -108,6 +113,15 @@ export interface GameMessage {
   text: string;
   type: 'info' | 'alert' | 'thief' | 'detective' | 'system';
   turn: number;
+  /** If set, message is hidden from detectives until this condition is met */
+  revealCondition?: 'next-thief-turn' | 'camera-scan' | 'never';
+}
+
+/** Messages queued to appear later (not yet shown in the log) */
+export interface PendingMessage {
+  message: GameMessage;
+  revealOn: 'next-thief-turn' | 'camera-used';
+  cameraId?: number; // for camera-related reveals
 }
 
 // ===== ROOM DEFINITIONS =====

@@ -12,11 +12,12 @@ type Action =
   | { type: 'START_GAME'; mode: GameMode; numDetectives: number }
   | { type: 'CELL_CLICK'; pos: Position }
   | { type: 'ROLL_DICE' }
-  | { type: 'USE_SPECIAL' }
+  | { type: 'USE_SPECIAL'; eyeTarget?: 'self' | number }
   | { type: 'SKIP_SPECIAL' }
   | { type: 'END_MOVE' }
   | { type: 'ATTEMPT_ESCAPE'; exitId: number }
   | { type: 'AI_THIEF_TURN' }
+  | { type: 'THIEF_END_TURN' }
   | { type: 'SET_STATE'; state: GameState }
   | { type: 'RESET' };
 
@@ -42,13 +43,21 @@ function reducer(state: GameState | null, action: Action): GameState | null {
     case 'ROLL_DICE':
       return rollDetectiveDice(state);
     case 'USE_SPECIAL':
-      return useSpecialAction(state);
+      return useSpecialAction(state, action.eyeTarget);
     case 'SKIP_SPECIAL':
       return skipSpecialAction(state);
     case 'END_MOVE':
       return endDetectiveMove(state);
     case 'ATTEMPT_ESCAPE':
       return thiefAttemptEscape(state, action.exitId);
+    case 'THIEF_END_TURN': {
+      if (state.turnPhase !== 'thief-move') return state;
+      return {
+        ...state,
+        turnPhase: 'detective-roll',
+        movesRemaining: 0,
+      };
+    }
     case 'AI_THIEF_TURN': {
       let s = state;
 
@@ -127,8 +136,12 @@ export function useGameState() {
     dispatch({ type: 'ROLL_DICE' });
   }, []);
 
-  const useSpecial = useCallback(() => {
-    dispatch({ type: 'USE_SPECIAL' });
+  const useSpecial = useCallback((eyeTarget?: 'self' | number) => {
+    dispatch({ type: 'USE_SPECIAL', eyeTarget });
+  }, []);
+
+  const thiefEndTurn = useCallback(() => {
+    dispatch({ type: 'THIEF_END_TURN' });
   }, []);
 
   const skipSpecial = useCallback(() => {
@@ -177,6 +190,7 @@ export function useGameState() {
     skipSpecial,
     endMove,
     attemptEscape,
+    thiefEndTurn,
     reset,
     getHighlightedCells,
   };

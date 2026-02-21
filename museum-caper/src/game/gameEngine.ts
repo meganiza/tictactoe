@@ -1,6 +1,6 @@
 import type {
   GameState, GameMode, Detective, DetectiveColor,
-  ThiefState, DiceResult, SpecialAction, GameMessage, Position, CellData, ExitInfo,
+  ThiefState, DiceResult, SpecialAction, GameMessage, PendingMessage, Position, CellData, ExitInfo,
 } from './types';
 import {
   createBoardLayout, getDefaultPaintingPositions, getDetectiveStartPositions,
@@ -114,6 +114,9 @@ export function createInitialGameState(
     totalPaintings: paintingPositions.length,
     exits: getAllExits(board).map(e => e.info),
     messages: [msg('The thief has entered the museum! Detectives, be on alert.', 'system')],
+    pendingMessages: [],
+    knownDisabledCameras: [],
+    knownPowerOff: false,
     setupPhase: 'ready',
     paintingsToPlace: 0,
   };
@@ -151,28 +154,41 @@ export function moveThief(state: GameState, to: Position): GameState {
 
   const newBoard = state.board.map(row => row.map(c => ({ ...c })));
   const messages = [...state.messages];
+  const pendingMessages = [...state.pendingMessages];
   let remaining = state.movesRemaining - 1;
 
   // Check for painting on this cell
   const cell = newBoard[to.row][to.col];
   if (cell.painting) {
-    // Thief steals the painting (removed next turn per rules, but we simplify)
     cell.painting = false;
     thief.paintingsStolen++;
-    messages.push(msg(`A painting has gone missing from ${getRoomName(to, newBoard)}!`, 'alert'));
+    // Defer painting theft reveal until next thief turn
+    pendingMessages.push({
+      message: msg(`A painting has gone missing from ${getRoomName(to, newBoard)}!`, 'alert'),
+      revealOn: 'next-thief-turn',
+    });
     newState.paintingsRemaining = state.paintingsRemaining - 1;
   }
 
   // Check for camera on this cell - thief can disable it
   if (cell.camera !== null && !thief.camerasDisabled.includes(cell.camera)) {
     thief.camerasDisabled = [...thief.camerasDisabled, cell.camera];
-    messages.push(msg(`The thief disabled camera ${cell.camera}.`, 'thief'));
+    // Defer camera disable message until detective tries to use that camera
+    pendingMessages.push({
+      message: msg(`Camera ${cell.camera} has been disconnected!`, 'alert'),
+      revealOn: 'camera-used',
+      cameraId: cell.camera,
+    });
   }
 
   // Check for power room
   if (cell.isPowerRoom && !thief.powerOff) {
     thief.powerOff = true;
-    messages.push(msg('The thief has cut the power!', 'thief'));
+    // Defer power cut message until detective tries to use motion/scan
+    pendingMessages.push({
+      message: msg('The power has been cut!', 'alert'),
+      revealOn: 'camera-used',
+    });
   }
 
   // Update visible position if thief was spotted
@@ -184,6 +200,7 @@ export function moveThief(state: GameState, to: Position): GameState {
   newState.board = newBoard;
   newState.movesRemaining = remaining;
   newState.messages = messages;
+  newState.pendingMessages = pendingMessages;
 
   if (remaining <= 0) {
     // Check if thief is caught (on same space as a detective)
@@ -298,19 +315,108 @@ export function moveDetective(state: GameState, to: Position): GameState {
   return newState;
 }
 
-export function useSpecialAction(state: GameState): GameState {
+/** Use the Eye action looking from a specific camera position */
+export function useEyeFromCamera(state: GameState, cameraId: number): GameState {
+  if (state.specialUsed || state.diceResult?.special !== 'eye') return state;
+
+  const detective = state.detectives[state.currentDetectiveIndex];
+  const thief = state.thief;
+  const messages = [...state.messages];
+  let newThief = { ...thief };
+  let pendingMessages = [...state.pendingMessages];
+  let knownDisabledCameras = [...state.knownDisabledCameras];
+
+  // Check if camera is disabled - detective discovers this now
+  if (thief.camerasDisabled.includes(cameraId)) {
+    if (!knownDisabledCameras.includes(cameraId)) {
+      knownDisabledCameras.push(cameraId);
+      // Flush the pending message for this camera
+      const remaining: PendingMessage[] = [];
+      for (const pm of pendingMessages) {
+        if (pm.revealOn === 'camera-used' && pm.cameraId === cameraId) {
+          messages.push(pm.message);
+        } else {
+          remaining.push(pm);
+        }
+      }
+      pendingMessages = remaining;
+    }
+    messages.push(msg(`${detective.displayName} tried camera ${cameraId} but it's been disconnected!`, 'alert'));
+  } else {
+    // Check if power is off - detective discovers this now
+    if (thief.powerOff) {
+      const { msgs: newMsgs, pending: newPending, known } = revealPowerOff(state, messages, pendingMessages);
+      messages.length = 0;
+      messages.push(...newMsgs);
+      pendingMessages = newPending;
+      messages.push(msg(`Camera ${cameraId} is offline - no power!`, 'alert'));
+    } else {
+      const cameraPositions = getCameraPositions(state.board);
+      const camPos = cameraPositions.get(cameraId);
+      if (camPos && hasLineOfSight(camPos, thief.position, state.board)) {
+        newThief.visible = true;
+        newThief.visiblePosition = { ...thief.position };
+        messages.push(msg(`Camera ${cameraId} spotted the thief at ${getRoomName(thief.position, state.board)}!`, 'alert'));
+      } else {
+        messages.push(msg(`Camera ${cameraId} shows no sign of the thief.`, 'detective'));
+      }
+    }
+  }
+
+  const newState: GameState = {
+    ...state,
+    thief: newThief,
+    specialUsed: true,
+    messages,
+    pendingMessages,
+    knownDisabledCameras,
+  };
+
+  if (state.movesRemaining <= 0) {
+    return advanceToNextTurn(newState);
+  }
+  return newState;
+}
+
+function revealPowerOff(
+  state: GameState,
+  messages: GameMessage[],
+  pendingMessages: PendingMessage[],
+): { msgs: GameMessage[]; pending: PendingMessage[]; known: boolean } {
+  if (state.knownPowerOff) return { msgs: messages, pending: pendingMessages, known: true };
+  const remaining: PendingMessage[] = [];
+  const newMsgs = [...messages];
+  for (const pm of pendingMessages) {
+    if (pm.revealOn === 'camera-used' && !pm.cameraId) {
+      // This is the power-off pending message
+      newMsgs.push(pm.message);
+    } else {
+      remaining.push(pm);
+    }
+  }
+  return { msgs: newMsgs, pending: remaining, known: true };
+}
+
+export function useSpecialAction(state: GameState, eyeTarget?: 'self' | number): GameState {
   if (state.specialUsed || !state.diceResult?.special) return state;
 
   const special = state.diceResult.special;
   const detective = state.detectives[state.currentDetectiveIndex];
   const thief = state.thief;
   const messages = [...state.messages];
+  let pendingMessages = [...state.pendingMessages];
+  let knownDisabledCameras = [...state.knownDisabledCameras];
+  let knownPowerOff = state.knownPowerOff;
 
   let newThief = { ...thief };
 
   switch (special) {
     case 'eye': {
-      // Check line of sight from detective to thief
+      // If a camera ID was specified, delegate to useEyeFromCamera
+      if (typeof eyeTarget === 'number') {
+        return useEyeFromCamera(state, eyeTarget);
+      }
+      // Default: detective looks with their own eyes (line of sight)
       if (hasLineOfSight(detective.position, thief.position, state.board)) {
         newThief.visible = true;
         newThief.visiblePosition = { ...thief.position };
@@ -325,43 +431,69 @@ export function useSpecialAction(state: GameState): GameState {
     }
     case 'motion': {
       if (thief.powerOff) {
+        // Detective discovers power is off
+        if (!knownPowerOff) {
+          const { msgs, pending, known } = revealPowerOff(state, messages, pendingMessages);
+          messages.length = 0;
+          messages.push(...msgs);
+          pendingMessages = pending;
+          knownPowerOff = known;
+        }
         messages.push(msg('Motion detectors are offline - the power has been cut!', 'alert'));
         break;
       }
-      if (thief.wiresCut < 2) {
-        // Thief CAN choose to cut wires (handled via AI or player choice)
-        // For now, we reveal the floor color
-        const floorColor = getFloorColorName(thief.position, state.board);
-        messages.push(msg(`Motion detector triggered! The thief is on ${floorColor} flooring.`, 'detective'));
-      } else {
-        const floorColor = getFloorColorName(thief.position, state.board);
-        messages.push(msg(`Motion detector triggered! The thief is on ${floorColor} flooring.`, 'detective'));
-      }
+      const floorColor = getFloorColorName(thief.position, state.board);
+      messages.push(msg(`Motion detector triggered! The thief is on ${floorColor} flooring.`, 'detective'));
       break;
     }
     case 'scan': {
       if (thief.powerOff) {
+        // Detective discovers power is off
+        if (!knownPowerOff) {
+          const { msgs, pending, known } = revealPowerOff(state, messages, pendingMessages);
+          messages.length = 0;
+          messages.push(...msgs);
+          pendingMessages = pending;
+          knownPowerOff = known;
+        }
         messages.push(msg('Camera system is offline - the power has been cut!', 'alert'));
         break;
       }
       const cameras = getCameraPositions(state.board);
-      const disabledCams: number[] = [];
+      const newlyDiscoveredDisabled: number[] = [];
       const seenByCams: number[] = [];
       cameras.forEach((pos, num) => {
         if (thief.camerasDisabled.includes(num)) {
-          disabledCams.push(num);
+          // Detective discovers this camera is disabled
+          if (!knownDisabledCameras.includes(num)) {
+            knownDisabledCameras.push(num);
+            newlyDiscoveredDisabled.push(num);
+          } else {
+            newlyDiscoveredDisabled.push(num);
+          }
         } else if (hasLineOfSight(pos, thief.position, state.board)) {
           seenByCams.push(num);
         }
       });
-      if (disabledCams.length > 0) {
-        messages.push(msg(`Camera(s) ${disabledCams.join(', ')} have been disconnected!`, 'alert'));
+      // Flush pending messages for discovered disabled cameras
+      const remainingPending: PendingMessage[] = [];
+      for (const pm of pendingMessages) {
+        if (pm.revealOn === 'camera-used' && pm.cameraId && knownDisabledCameras.includes(pm.cameraId)) {
+          messages.push(pm.message);
+        } else {
+          remainingPending.push(pm);
+        }
+      }
+      pendingMessages = remainingPending;
+
+      if (newlyDiscoveredDisabled.length > 0) {
+        messages.push(msg(`Camera(s) ${newlyDiscoveredDisabled.join(', ')} have been disconnected!`, 'alert'));
       }
       if (seenByCams.length > 0) {
         newThief.visible = true;
         newThief.visiblePosition = { ...thief.position };
         messages.push(msg(`Camera(s) ${seenByCams.join(', ')} spotted the thief!`, 'alert'));
-      } else if (disabledCams.length === 0) {
+      } else if (newlyDiscoveredDisabled.length === 0 && thief.camerasDisabled.length === 0) {
         messages.push(msg('All cameras operational. No sign of the thief.', 'detective'));
       } else {
         messages.push(msg('Remaining cameras show no sign of the thief.', 'detective'));
@@ -375,6 +507,9 @@ export function useSpecialAction(state: GameState): GameState {
     thief: newThief,
     specialUsed: true,
     messages,
+    pendingMessages,
+    knownDisabledCameras,
+    knownPowerOff,
   };
 
   // If movement is also done, advance
@@ -402,12 +537,25 @@ export function endDetectiveMove(state: GameState): GameState {
 }
 
 function advanceToNextTurn(state: GameState): GameState {
+  // Flush "next-thief-turn" pending messages into the visible log
+  const flushed: GameMessage[] = [];
+  const remaining: PendingMessage[] = [];
+  for (const pm of state.pendingMessages) {
+    if (pm.revealOn === 'next-thief-turn') {
+      flushed.push(pm.message);
+    } else {
+      remaining.push(pm);
+    }
+  }
+
   const nextThiefTurn: GameState = {
     ...state,
     turnPhase: 'thief-move',
     movesRemaining: 3,
     diceResult: null,
     specialUsed: false,
+    messages: [...state.messages, ...flushed],
+    pendingMessages: remaining,
   };
 
   // After each detective, the thief gets a turn

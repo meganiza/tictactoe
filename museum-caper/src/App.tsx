@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useGameState } from './game/useGameState';
 import { GameSetup } from './components/GameSetup';
 import { Board } from './components/Board';
@@ -12,10 +12,12 @@ import './App.css';
 function App() {
   const {
     state, startGame, clickCell, rollDice,
-    useSpecial, skipSpecial, endMove, attemptEscape, reset,
+    useSpecial, skipSpecial, endMove, attemptEscape, thiefEndTurn, reset,
   } = useGameState();
 
   const [thiefScreenVisible, setThiefScreenVisible] = useState(false);
+  // New: detectives must click "Ready" to show the thief modal
+  const [detectivesReady, setDetectivesReady] = useState(false);
 
   // Compute highlighted cells
   const highlightedCells = useMemo((): Position[] => {
@@ -38,22 +40,81 @@ function App() {
     return [];
   }, [state, thiefScreenVisible]);
 
-  // Handle thief screen for local multiplayer
+  // Handle thief screen for local multiplayer:
+  // Instead of auto-showing, wait for detectives to click "Ready to Switch"
   const showThiefScreen = state?.mode === 'local-multiplayer'
     && state.phase === 'playing'
     && state.turnPhase === 'thief-move'
     && thiefScreenVisible;
 
-  // Auto-show thief screen when it becomes thief's turn in local multiplayer
+  // Show "ready to switch" prompt when transitioning to thief turn
+  const showReadyPrompt = state?.mode === 'local-multiplayer'
+    && state.phase === 'playing'
+    && state.turnPhase === 'thief-move'
+    && !thiefScreenVisible
+    && !detectivesReady;
+
+  // When detectives click ready, show the thief screen modal
+  const handleDetectivesReady = useCallback(() => {
+    setDetectivesReady(true);
+    setThiefScreenVisible(true);
+  }, []);
+
+  // Reset detectivesReady when turn changes away from thief
   useEffect(() => {
-    if (state?.mode === 'local-multiplayer' && state.turnPhase === 'thief-move' && state.phase === 'playing') {
-      setThiefScreenVisible(true);
+    if (state?.turnPhase !== 'thief-move') {
+      setDetectivesReady(false);
+      setThiefScreenVisible(false);
     }
-  }, [state?.turnPhase, state?.mode, state?.phase]);
+  }, [state?.turnPhase]);
+
+  // Determine which position is "selected" for arrow key movement
+  const selectedPos = useMemo((): Position | null => {
+    if (!state || state.phase !== 'playing') return null;
+    if (state.turnPhase === 'thief-move' && state.mode === 'local-multiplayer' && !thiefScreenVisible && detectivesReady) {
+      if (state.thief.position.row === -1) return null; // can't arrow-key from off-board
+      return state.thief.position;
+    }
+    if (state.turnPhase === 'detective-move' && state.movesRemaining > 0) {
+      return state.detectives[state.currentDetectiveIndex].position;
+    }
+    return null;
+  }, [state, thiefScreenVisible, detectivesReady]);
+
+  // Arrow key movement
+  useEffect(() => {
+    if (!selectedPos) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const deltas: Record<string, [number, number]> = {
+        ArrowUp: [-1, 0],
+        ArrowDown: [1, 0],
+        ArrowLeft: [0, -1],
+        ArrowRight: [0, 1],
+      };
+      const delta = deltas[e.key];
+      if (!delta) return;
+      e.preventDefault();
+      const target: Position = { row: selectedPos.row + delta[0], col: selectedPos.col + delta[1] };
+      // Check if target is in highlighted cells (valid move)
+      if (highlightedCells.some(p => p.row === target.row && p.col === target.col)) {
+        clickCell(target);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedPos, highlightedCells, clickCell]);
 
   if (!state) {
     return <GameSetup onStart={startGame} />;
   }
+
+  // In local multiplayer during thief's turn, show thief on the board
+  const showThiefOnBoard = state.mode === 'local-multiplayer'
+    && state.turnPhase === 'thief-move'
+    && !thiefScreenVisible
+    && detectivesReady;
 
   return (
     <div className="app">
@@ -66,8 +127,9 @@ function App() {
         <div className="board-wrapper">
           <Board
             state={state}
-            highlightedCells={highlightedCells}
+            highlightedCells={showReadyPrompt ? [] : highlightedCells}
             onCellClick={clickCell}
+            forceShowThief={showThiefOnBoard}
           />
         </div>
 
@@ -79,10 +141,20 @@ function App() {
             onSkipSpecial={skipSpecial}
             onEndMove={endMove}
             onAttemptEscape={attemptEscape}
+            onThiefEndTurn={thiefEndTurn}
             onReset={reset}
           />
         </div>
       </div>
+
+      {/* Ready prompt: detectives review board, then click to hand off */}
+      {showReadyPrompt && (
+        <div className="ready-prompt">
+          <button className="btn btn-primary btn-ready" onClick={handleDetectivesReady}>
+            Ready to Switch to Thief
+          </button>
+        </div>
+      )}
 
       {showThiefScreen && (
         <ThiefScreen

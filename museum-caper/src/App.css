@@ -541,6 +541,36 @@
   color: #fff;
 }
 
+/* ===== READY PROMPT ===== */
+.ready-prompt {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 500;
+  animation: bounce-in 0.3s ease;
+}
+
+.btn-ready {
+  padding: 14px 32px;
+  font-size: 1.1rem;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(67, 97, 238, 0.5);
+}
+
+@keyframes bounce-in {
+  0% { transform: translateX(-50%) translateY(20px); opacity: 0; }
+  100% { transform: translateX(-50%) translateY(0); opacity: 1; }
+}
+
+/* ===== EYE CHOICES ===== */
+.eye-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
 /* ===== RESPONSIVE ===== */
 @media (max-width: 768px) {
   .game-layout {

@@ -6,6 +6,7 @@ interface BoardProps {
   state: GameState;
   highlightedCells: Position[];
   onCellClick: (pos: Position) => void;
+  forceShowThief?: boolean;
 }
 
 const CELL_SIZE = 40;
@@ -28,7 +29,7 @@ const ROOM_BORDER_COLORS: Record<string, string> = {
   gray: '#999',
 };
 
-export const Board: React.FC<BoardProps> = ({ state, highlightedCells, onCellClick }) => {
+export const Board: React.FC<BoardProps> = ({ state, highlightedCells, onCellClick, forceShowThief }) => {
   const { board, thief, detectives, boardRows, boardCols } = state;
 
   const highlightSet = useMemo(() => {
@@ -103,18 +104,38 @@ export const Board: React.FC<BoardProps> = ({ state, highlightedCells, onCellCli
           <DetectiveToken key={det.id} detective={det} />
         ))}
 
-        {/* Thief token (only if visible) */}
-        {thief.visible && thief.visiblePosition && (
-          <circle
-            cx={thief.visiblePosition.col * CELL_SIZE + CELL_SIZE / 2}
-            cy={thief.visiblePosition.row * CELL_SIZE + CELL_SIZE / 2}
-            r={CELL_SIZE * 0.35}
-            fill="#333"
-            stroke="#000"
-            strokeWidth="2"
-            className="thief-token"
-          />
-        )}
+        {/* Thief token (visible when spotted by detectives OR forced visible during thief's own turn) */}
+        {(() => {
+          const showThief = forceShowThief && thief.position.row !== -1;
+          const showSpotted = thief.visible && thief.visiblePosition;
+          if (showThief) {
+            return (
+              <circle
+                cx={thief.position.col * CELL_SIZE + CELL_SIZE / 2}
+                cy={thief.position.row * CELL_SIZE + CELL_SIZE / 2}
+                r={CELL_SIZE * 0.35}
+                fill="#333"
+                stroke="#000"
+                strokeWidth="2"
+                className="thief-token"
+              />
+            );
+          }
+          if (showSpotted) {
+            return (
+              <circle
+                cx={thief.visiblePosition!.col * CELL_SIZE + CELL_SIZE / 2}
+                cy={thief.visiblePosition!.row * CELL_SIZE + CELL_SIZE / 2}
+                r={CELL_SIZE * 0.35}
+                fill="#333"
+                stroke="#000"
+                strokeWidth="2"
+                className="thief-token"
+              />
+            );
+          }
+          return null;
+        })()}
       </svg>
     </div>
   );
@@ -199,19 +220,19 @@ const BoardCell: React.FC<{
       {cell.camera !== null && (
         <>
           <circle
-            cx={x + CELL_SIZE - 10}
-            cy={y + 10}
-            r={7}
+            cx={x + CELL_SIZE / 2}
+            cy={y + CELL_SIZE / 2}
+            r={CELL_SIZE * 0.4}
             fill="#ff6600"
             stroke="#cc5500"
-            strokeWidth="1"
+            strokeWidth="1.5"
           />
           <text
-            x={x + CELL_SIZE - 10}
-            y={y + 10}
+            x={x + CELL_SIZE / 2}
+            y={y + CELL_SIZE / 2}
             textAnchor="middle"
             dominantBaseline="middle"
-            fontSize="8"
+            fontSize="14"
             fill="#fff"
             fontWeight="bold"
           >
@@ -222,16 +243,7 @@ const BoardCell: React.FC<{
 
       {/* Painting icon */}
       {cell.painting && (
-        <rect
-          x={x + 6}
-          y={y + 6}
-          width={CELL_SIZE - 12}
-          height={CELL_SIZE - 12}
-          fill="gold"
-          stroke="#B8860B"
-          strokeWidth="2"
-          rx="2"
-        />
+        <PaintingIcon x={x} y={y} row={row} col={col} />
       )}
 
       {/* Power room indicator */}
@@ -261,6 +273,157 @@ const BoardCell: React.FC<{
     </g>
   );
 });
+
+// Simple renditions of famous paintings, mapped by board position
+const PAINTING_STYLES: Record<string, { bg: string; render: (x: number, y: number, s: number) => React.ReactNode }> = {
+  // Mona Lisa - face with smile
+  '2,2': {
+    bg: '#4a3c28',
+    render: (x, y, s) => (
+      <>
+        <ellipse cx={x + s/2} cy={y + s*0.4} rx={s*0.2} ry={s*0.25} fill="#deb887" />
+        <path d={`M${x+s*0.35} ${y+s*0.48} Q${x+s*0.5} ${y+s*0.58} ${x+s*0.65} ${y+s*0.48}`} stroke="#5c4033" strokeWidth="0.8" fill="none" />
+        <circle cx={x+s*0.42} cy={y+s*0.35} r={1} fill="#3c2415" />
+        <circle cx={x+s*0.58} cy={y+s*0.35} r={1} fill="#3c2415" />
+        <path d={`M${x+s*0.3} ${y+s*0.55} L${x+s*0.5} ${y+s*0.85} L${x+s*0.7} ${y+s*0.55}`} fill="#2d5a1e" />
+      </>
+    ),
+  },
+  // Starry Night - swirls and moon
+  '3,3': {
+    bg: '#1a237e',
+    render: (x, y, s) => (
+      <>
+        <circle cx={x+s*0.75} cy={y+s*0.25} r={s*0.12} fill="#ffd54f" />
+        <path d={`M${x+s*0.15} ${y+s*0.35} Q${x+s*0.35} ${y+s*0.15} ${x+s*0.55} ${y+s*0.35}`} stroke="#64b5f6" strokeWidth="2" fill="none" />
+        <path d={`M${x+s*0.25} ${y+s*0.55} Q${x+s*0.45} ${y+s*0.35} ${x+s*0.65} ${y+s*0.55}`} stroke="#42a5f5" strokeWidth="1.5" fill="none" />
+        <rect x={x+s*0.1} y={y+s*0.65} width={s*0.8} height={s*0.25} fill="#2e7d32" rx="1" />
+      </>
+    ),
+  },
+  // Girl with a Pearl Earring - profile with earring
+  '2,7': {
+    bg: '#1a1a2e',
+    render: (x, y, s) => (
+      <>
+        <ellipse cx={x+s*0.5} cy={y+s*0.38} rx={s*0.2} ry={s*0.25} fill="#deb887" />
+        <ellipse cx={x+s*0.5} cy={y+s*0.2} rx={s*0.22} ry={s*0.18} fill="#1565c0" />
+        <circle cx={x+s*0.58} cy={y+s*0.55} r={s*0.06} fill="#e0e0e0" stroke="#fff" strokeWidth="0.5" />
+        <circle cx={x+s*0.42} cy={y+s*0.34} r={1} fill="#3c2415" />
+      </>
+    ),
+  },
+  // The Scream - figure with open mouth
+  '2,9': {
+    bg: '#ff6f00',
+    render: (x, y, s) => (
+      <>
+        <path d={`M${x+s*0.1} ${y+s*0.3} Q${x+s*0.5} ${y+s*0.1} ${x+s*0.9} ${y+s*0.3}`} stroke="#d32f2f" strokeWidth="1.5" fill="none" />
+        <path d={`M${x+s*0.1} ${y+s*0.5} Q${x+s*0.5} ${y+s*0.3} ${x+s*0.9} ${y+s*0.5}`} stroke="#e65100" strokeWidth="1" fill="none" />
+        <ellipse cx={x+s*0.5} cy={y+s*0.45} rx={s*0.13} ry={s*0.17} fill="#deb887" />
+        <ellipse cx={x+s*0.5} cy={y+s*0.55} rx={s*0.06} ry={s*0.08} fill="#3e2723" />
+        <circle cx={x+s*0.45} cy={y+s*0.4} r={1.2} fill="#3e2723" />
+        <circle cx={x+s*0.55} cy={y+s*0.4} r={1.2} fill="#3e2723" />
+      </>
+    ),
+  },
+  // Water Lilies - pond with flowers
+  '2,13': {
+    bg: '#4db6ac',
+    render: (x, y, s) => (
+      <>
+        <rect x={x+s*0.05} y={y+s*0.05} width={s*0.9} height={s*0.9} fill="#26a69a" rx="1" />
+        <ellipse cx={x+s*0.3} cy={y+s*0.4} rx={s*0.12} ry={s*0.06} fill="#81c784" />
+        <ellipse cx={x+s*0.7} cy={y+s*0.6} rx={s*0.14} ry={s*0.06} fill="#66bb6a" />
+        <circle cx={x+s*0.3} cy={y+s*0.38} r={s*0.05} fill="#f48fb1" />
+        <circle cx={x+s*0.7} cy={y+s*0.58} r={s*0.05} fill="#fff176" />
+        <circle cx={x+s*0.5} cy={y+s*0.7} r={s*0.04} fill="#f8bbd0" />
+      </>
+    ),
+  },
+  // The Great Wave - wave pattern
+  '3,14': {
+    bg: '#e3f2fd',
+    render: (x, y, s) => (
+      <>
+        <rect x={x+s*0.05} y={y+s*0.6} width={s*0.9} height={s*0.35} fill="#1565c0" />
+        <path d={`M${x} ${y+s*0.6} Q${x+s*0.25} ${y+s*0.2} ${x+s*0.5} ${y+s*0.45} Q${x+s*0.75} ${y+s*0.65} ${x+s} ${y+s*0.4}`} fill="#1e88e5" />
+        <path d={`M${x+s*0.35} ${y+s*0.3} L${x+s*0.4} ${y+s*0.22} L${x+s*0.45} ${y+s*0.3}`} stroke="white" strokeWidth="0.7" fill="none" />
+        <circle cx={x+s*0.8} cy={y+s*0.2} r={s*0.08} fill="#ffecb3" />
+      </>
+    ),
+  },
+  // The Persistence of Memory - melting clock
+  '13,2': {
+    bg: '#c8b88a',
+    render: (x, y, s) => (
+      <>
+        <rect x={x+s*0.05} y={y+s*0.55} width={s*0.9} height={s*0.4} fill="#8d6e63" />
+        <rect x={x+s*0.05} y={y+s*0.05} width={s*0.9} height={s*0.5} fill="#90caf9" />
+        <ellipse cx={x+s*0.5} cy={y+s*0.45} rx={s*0.2} ry={s*0.12} fill="#e0e0e0" stroke="#757575" strokeWidth="0.5" />
+        <path d={`M${x+s*0.5} ${y+s*0.35} L${x+s*0.5} ${y+s*0.45} L${x+s*0.62} ${y+s*0.45}`} stroke="#333" strokeWidth="0.8" fill="none" />
+        <path d={`M${x+s*0.3} ${y+s*0.55} Q${x+s*0.4} ${y+s*0.7} ${x+s*0.5} ${y+s*0.55}`} fill="#bdbdbd" />
+      </>
+    ),
+  },
+  // Sunflowers
+  '13,13': {
+    bg: '#f9a825',
+    render: (x, y, s) => (
+      <>
+        <rect x={x+s*0.3} y={y+s*0.6} width={s*0.4} height={s*0.35} fill="#6d4c41" rx="2" />
+        <circle cx={x+s*0.35} cy={y+s*0.35} r={s*0.15} fill="#fdd835" />
+        <circle cx={x+s*0.35} cy={y+s*0.35} r={s*0.07} fill="#795548" />
+        <circle cx={x+s*0.65} cy={y+s*0.3} r={s*0.13} fill="#ffee58" />
+        <circle cx={x+s*0.65} cy={y+s*0.3} r={s*0.06} fill="#6d4c41" />
+        <circle cx={x+s*0.5} cy={y+s*0.18} r={s*0.1} fill="#fbc02d" />
+        <circle cx={x+s*0.5} cy={y+s*0.18} r={s*0.05} fill="#795548" />
+      </>
+    ),
+  },
+  // American Gothic - two figures
+  '14,14': {
+    bg: '#8d6e63',
+    render: (x, y, s) => (
+      <>
+        <rect x={x+s*0.25} y={y+s*0.6} width={s*0.5} height={s*0.35} fill="#795548" />
+        <circle cx={x+s*0.35} cy={y+s*0.3} r={s*0.1} fill="#deb887" />
+        <circle cx={x+s*0.65} cy={y+s*0.3} r={s*0.1} fill="#deb887" />
+        <rect x={x+s*0.28} y={y+s*0.4} width={s*0.15} height={s*0.3} fill="#1a1a1a" />
+        <rect x={x+s*0.57} y={y+s*0.4} width={s*0.15} height={s*0.3} fill="#4caf50" />
+        <line x1={x+s*0.35} y1={y+s*0.4} x2={x+s*0.35} y2={y+s*0.8} stroke="#795548" strokeWidth="1" />
+      </>
+    ),
+  },
+};
+
+const PaintingIcon: React.FC<{ x: number; y: number; row: number; col: number }> = ({ x, y, row, col }) => {
+  const key = `${row},${col}`;
+  const style = PAINTING_STYLES[key];
+  const pad = 4;
+  const s = CELL_SIZE - pad * 2;
+  const px = x + pad;
+  const py = y + pad;
+
+  if (style) {
+    return (
+      <g>
+        <rect x={px} y={py} width={s} height={s} fill={style.bg} stroke="#B8860B" strokeWidth="2" rx="2" />
+        <clipPath id={`clip-${row}-${col}`}>
+          <rect x={px} y={py} width={s} height={s} rx="2" />
+        </clipPath>
+        <g clipPath={`url(#clip-${row}-${col})`}>
+          {style.render(px, py, s)}
+        </g>
+      </g>
+    );
+  }
+
+  // Fallback: gold frame
+  return (
+    <rect x={px} y={py} width={s} height={s} fill="gold" stroke="#B8860B" strokeWidth="2" rx="2" />
+  );
+};
 
 const DetectiveToken: React.FC<{ detective: Detective }> = ({ detective }) => {
   const cx = detective.position.col * CELL_SIZE + CELL_SIZE / 2;

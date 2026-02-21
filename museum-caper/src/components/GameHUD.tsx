@@ -1,19 +1,22 @@
+import { useState } from 'react';
 import type { GameState } from '../game/types';
 import { getAdjacentExits } from '../game/gameEngine';
 
 interface GameHUDProps {
   state: GameState;
   onRollDice: () => void;
-  onUseSpecial: () => void;
+  onUseSpecial: (eyeTarget?: 'self' | number) => void;
   onSkipSpecial: () => void;
   onEndMove: () => void;
   onAttemptEscape: (exitId: number) => void;
+  onThiefEndTurn: () => void;
   onReset: () => void;
 }
 
 export const GameHUD = ({
-  state, onRollDice, onUseSpecial, onSkipSpecial, onEndMove, onAttemptEscape, onReset,
+  state, onRollDice, onUseSpecial, onSkipSpecial, onEndMove, onAttemptEscape, onThiefEndTurn, onReset,
 }: GameHUDProps) => {
+  const [showEyeChoices, setShowEyeChoices] = useState(false);
   const {
     phase, turnPhase, thief, detectives, currentDetectiveIndex,
     diceResult, movesRemaining, specialUsed, mode,
@@ -78,10 +81,33 @@ export const GameHUD = ({
 
               {!specialUsed && diceResult?.special && (
                 <>
-                  <button className="btn btn-accent" onClick={onUseSpecial}>
-                    Use {getSpecialName(diceResult.special)}
-                  </button>
-                  <button className="btn btn-secondary" onClick={onSkipSpecial}>
+                  {diceResult.special === 'eye' && !showEyeChoices ? (
+                    <button className="btn btn-accent" onClick={() => setShowEyeChoices(true)}>
+                      Use {getSpecialName(diceResult.special)}
+                    </button>
+                  ) : diceResult.special === 'eye' && showEyeChoices ? (
+                    <div className="eye-choices">
+                      <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>Look from:</span>
+                      <button className="btn btn-accent" onClick={() => { onUseSpecial('self'); setShowEyeChoices(false); }}>
+                        My Position
+                      </button>
+                      {[1, 2, 3, 4, 5, 6].map(camId => (
+                        <button
+                          key={camId}
+                          className="btn btn-primary"
+                          style={{ padding: '4px 8px', fontSize: '0.8rem' }}
+                          onClick={() => { onUseSpecial(camId); setShowEyeChoices(false); }}
+                        >
+                          Cam {camId}
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <button className="btn btn-accent" onClick={() => onUseSpecial()}>
+                      Use {getSpecialName(diceResult.special)}
+                    </button>
+                  )}
+                  <button className="btn btn-secondary" onClick={() => { onSkipSpecial(); setShowEyeChoices(false); }}>
                     Skip
                   </button>
                 </>
@@ -93,20 +119,29 @@ export const GameHUD = ({
             </>
           )}
 
-          {/* Thief escape (local multiplayer) */}
-          {turnPhase === 'thief-move' && mode === 'local-multiplayer' && adjacentExits.length > 0 && thief.paintingsStolen >= 3 && (
-            <div className="escape-options">
-              <span>Try to escape:</span>
-              {adjacentExits.map(exit => (
-                <button
-                  key={exit.id}
-                  className="btn btn-accent"
-                  onClick={() => onAttemptEscape(exit.id)}
-                >
-                  Exit {exit.id} ({exit.type})
+          {/* Thief actions (local multiplayer) */}
+          {turnPhase === 'thief-move' && mode === 'local-multiplayer' && (
+            <>
+              {adjacentExits.length > 0 && thief.paintingsStolen >= 3 && (
+                <div className="escape-options">
+                  <span>Try to escape:</span>
+                  {adjacentExits.map(exit => (
+                    <button
+                      key={exit.id}
+                      className="btn btn-accent"
+                      onClick={() => onAttemptEscape(exit.id)}
+                    >
+                      Exit {exit.id} ({exit.type})
+                    </button>
+                  ))}
+                </div>
+              )}
+              {thief.position.row !== -1 && (
+                <button className="btn btn-secondary" onClick={onThiefEndTurn}>
+                  End Turn ({movesRemaining} moves left)
                 </button>
-              ))}
-            </div>
+              )}
+            </>
           )}
         </div>
       )}
