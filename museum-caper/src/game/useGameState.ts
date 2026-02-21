@@ -3,7 +3,7 @@ import type { GameState, GameMode, Position } from './types';
 import {
   createInitialGameState, moveThief, moveDetective, rollDetectiveDice,
   useSpecialAction, skipSpecialAction, endDetectiveMove, thiefAttemptEscape,
-  posEquals,
+  resolveWireDecision, posEquals,
 } from './gameEngine';
 import { getAIThiefMove, getAIEscapeExit } from './aiThief';
 import { getReachableCells, getAllExits } from './boardData';
@@ -18,6 +18,7 @@ type Action =
   | { type: 'ATTEMPT_ESCAPE'; exitId: number }
   | { type: 'AI_THIEF_TURN' }
   | { type: 'THIEF_END_TURN' }
+  | { type: 'THIEF_WIRE_DECIDE'; cut: boolean }
   | { type: 'SET_STATE'; state: GameState }
   | { type: 'RESET' };
 
@@ -58,6 +59,8 @@ function reducer(state: GameState | null, action: Action): GameState | null {
         movesRemaining: 0,
       };
     }
+    case 'THIEF_WIRE_DECIDE':
+      return resolveWireDecision(state, action.cut);
     case 'AI_THIEF_TURN': {
       let s = state;
 
@@ -144,6 +147,10 @@ export function useGameState() {
     dispatch({ type: 'THIEF_END_TURN' });
   }, []);
 
+  const wireDecide = useCallback((cut: boolean) => {
+    dispatch({ type: 'THIEF_WIRE_DECIDE', cut });
+  }, []);
+
   const skipSpecial = useCallback(() => {
     dispatch({ type: 'SKIP_SPECIAL' });
   }, []);
@@ -191,6 +198,7 @@ export function useGameState() {
     endMove,
     attemptEscape,
     thiefEndTurn,
+    wireDecide,
     reset,
     getHighlightedCells,
   };

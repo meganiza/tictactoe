@@ -12,7 +12,7 @@ import './App.css';
 function App() {
   const {
     state, startGame, clickCell, rollDice,
-    useSpecial, skipSpecial, endMove, attemptEscape, thiefEndTurn, reset,
+    useSpecial, skipSpecial, endMove, attemptEscape, thiefEndTurn, wireDecide, reset,
   } = useGameState();
 
   const [thiefScreenVisible, setThiefScreenVisible] = useState(false);
@@ -53,6 +53,12 @@ function App() {
     && state.turnPhase === 'thief-move'
     && !thiefScreenVisible
     && !detectivesReady;
+
+  // isThiefView: true when the thief player is actively viewing the board
+  const isThiefView = state?.mode === 'local-multiplayer'
+    && state.phase === 'playing'
+    && (state.turnPhase === 'thief-move' || state.turnPhase === 'thief-wire-decision')
+    && detectivesReady;
 
   // When detectives click ready, show the thief screen modal
   const handleDetectivesReady = useCallback(() => {
@@ -130,6 +136,7 @@ function App() {
             highlightedCells={showReadyPrompt ? [] : highlightedCells}
             onCellClick={clickCell}
             forceShowThief={showThiefOnBoard}
+            isThiefView={isThiefView || false}
           />
         </div>
 
@@ -142,7 +149,9 @@ function App() {
             onEndMove={endMove}
             onAttemptEscape={attemptEscape}
             onThiefEndTurn={thiefEndTurn}
+            onWireDecide={wireDecide}
             onReset={reset}
+            isThiefView={isThiefView || false}
           />
         </div>
       </div>

@@ -243,6 +243,53 @@
   flex-wrap: wrap;
 }
 
+/* ===== VERTICAL DICE LAYOUT ===== */
+.dice-action-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dice-action-row {
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  align-items: center;
+}
+
+.special-used-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #999;
+  font-style: italic;
+}
+
+/* ===== WIRE DECISION ===== */
+.wire-decision {
+  background: #1a1a2e;
+  color: #fff;
+  border-radius: 8px;
+  padding: 16px;
+  text-align: center;
+}
+
+.wire-decision p {
+  margin: 0 0 8px 0;
+  font-size: 0.95rem;
+}
+
+.wire-decision .wire-info {
+  font-size: 0.85rem;
+  color: #aaa;
+}
+
+.wire-buttons {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 12px;
+}
+
 /* ===== STATS ===== */
 .hud-stats {
   background: #fff;

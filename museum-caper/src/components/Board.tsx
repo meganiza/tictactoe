@@ -7,6 +7,7 @@ interface BoardProps {
   highlightedCells: Position[];
   onCellClick: (pos: Position) => void;
   forceShowThief?: boolean;
+  isThiefView?: boolean;
 }
 
 const CELL_SIZE = 40;
@@ -29,7 +30,7 @@ const ROOM_BORDER_COLORS: Record<string, string> = {
   gray: '#999',
 };
 
-export const Board: React.FC<BoardProps> = ({ state, highlightedCells, onCellClick, forceShowThief }) => {
+export const Board: React.FC<BoardProps> = ({ state, highlightedCells, onCellClick, forceShowThief, isThiefView }) => {
   const { board, thief, detectives, boardRows, boardCols } = state;
 
   const highlightSet = useMemo(() => {
@@ -39,6 +40,17 @@ export const Board: React.FC<BoardProps> = ({ state, highlightedCells, onCellCli
     }
     return set;
   }, [highlightedCells]);
+
+  // Ghost paintings: paintings that were stolen but still shown to detectives until next thief turn
+  const ghostPaintingSet = useMemo(() => {
+    const set = new Set<string>();
+    if (!isThiefView && state.pendingStolenPaintings) {
+      for (const sp of state.pendingStolenPaintings) {
+        set.add(`${sp.pos.row},${sp.pos.col}`);
+      }
+    }
+    return set;
+  }, [isThiefView, state.pendingStolenPaintings]);
 
   const width = boardCols * CELL_SIZE;
   const height = boardRows * CELL_SIZE;
@@ -60,6 +72,7 @@ export const Board: React.FC<BoardProps> = ({ state, highlightedCells, onCellCli
               row={r}
               col={c}
               isHighlighted={highlightSet.has(`${r},${c}`)}
+              isGhostPainting={ghostPaintingSet.has(`${r},${c}`)}
               onClick={() => onCellClick({ row: r, col: c })}
             />
           ))
@@ -146,8 +159,9 @@ const BoardCell: React.FC<{
   row: number;
   col: number;
   isHighlighted: boolean;
+  isGhostPainting?: boolean;
   onClick: () => void;
-}> = React.memo(({ cell, row, col, isHighlighted, onClick }) => {
+}> = React.memo(({ cell, row, col, isHighlighted, isGhostPainting, onClick }) => {
   const x = col * CELL_SIZE;
   const y = row * CELL_SIZE;
 
@@ -241,8 +255,8 @@ const BoardCell: React.FC<{
         </>
       )}
 
-      {/* Painting icon */}
-      {cell.painting && (
+      {/* Painting icon (real or ghost for detective view) */}
+      {(cell.painting || isGhostPainting) && (
         <PaintingIcon x={x} y={y} row={row} col={col} />
       )}
 

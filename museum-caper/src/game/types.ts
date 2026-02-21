@@ -57,7 +57,7 @@ export interface ThiefState {
   hasMoved: boolean;           // has moved since last painting stolen
 }
 
-export type SpecialAction = 'eye' | 'motion' | 'scan' | null;
+export type SpecialAction = 'eye' | 'motion' | 'scan';
 
 export interface DiceResult {
   movement: number;         // 1-6
@@ -69,7 +69,8 @@ export type TurnPhase =
   | 'detective-roll'
   | 'detective-move'
   | 'detective-special'
-  | 'detective-done';
+  | 'detective-done'
+  | 'thief-wire-decision';
 
 export interface GameState {
   mode: GameMode;
@@ -102,6 +103,12 @@ export interface GameState {
   // Detective knowledge (what they've discovered)
   knownDisabledCameras: number[];  // cameras detectives know are disabled
   knownPowerOff: boolean;          // whether detectives know power is off
+
+  // Deferred painting theft (visible to thief immediately, detectives next turn)
+  pendingStolenPaintings: { pos: Position; roomName: string }[];
+
+  // Wire decision: stashed motion result while thief decides whether to cut
+  pendingMotionResult?: { floorColor: string };
 
   // Setup state
   setupPhase: 'mode' | 'detectives' | 'paintings' | 'locks' | 'ready';
